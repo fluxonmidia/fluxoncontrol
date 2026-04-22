@@ -1,13 +1,6 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <!-- 
-    Fluxon Mídia — Painel ERP
-    Repositório público — dados sensíveis (URL do Apps Script, credenciais)
-    são armazenados APENAS no localStorage do navegador do usuário.
-    Nenhum dado de cliente ou configuração é armazenado neste código.
-  -->
-  <meta name="robots" content="noindex, nofollow">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Painel de Scripts — Mídia & Publicidade</title>
@@ -4357,6 +4350,8 @@ function goSection(id){
           slCon.appendChild(opt);
         });
       }
+      // Popular checkboxes de locais no formulário de novo contrato
+      popularLocaisContrato('');
       carregarContratos(function(list){ todosContratos=list; renderListaContratos(list); });
     }
     var _locaisOk = todosLocais.length>0;
