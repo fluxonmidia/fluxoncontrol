@@ -8514,18 +8514,19 @@ function selecionarVendedorForm(id){
   var fs=document.getElementById('fvnd-status');
   if(fs){for(var i=0;i<fs.options.length;i++) fs.options[i].selected=fs.options[i].value===String(r[5]||'Ativo');}
   var fp=document.getElementById('fvnd-plano'); if(fp) fp.value=String(r[6]||'');
-  document.getElementById('fvnd-comissao-extra').value=r[7]||'';
-  setValor('fvnd-meta',r[8]);
-  document.getElementById('fvnd-obs').value=r[9]||'';
+  var fco=document.getElementById('fvnd-cvenda-override'); if(fco) setValor('fvnd-cvenda-override',r[7]);
+  var fcr=document.getElementById('fvnd-crec-override'); if(fcr) fcr.value=r[8]||'';
+  setValor('fvnd-meta',r[9]);
+  var fob=document.getElementById('fvnd-obs'); if(fob) fob.value=r[10]||'';
   var dcW=document.getElementById('fvnd-datacad-wrap'),dcE=document.getElementById('fvnd-datacad');
-  if(dcW&&dcE){var dc=String(r[10]||'').trim();dcW.style.display=dc?'':'none';dcE.value=dc;}
+  if(dcW&&dcE){var dc=String(r[11]||'').trim();dcW.style.display=dc?'':'none';dcE.value=dc;}
   showMsg('msg-vnd-vendedor','','');
 }
 
 function novoVendedor(){ editandoVendedorId=null; limparFormVendedor(); document.getElementById('form-vnd-vendedor-title').textContent='Novo vendedor'; }
 
 function limparFormVendedor(){
-  ['fvnd-nome','fvnd-cpf','fvnd-tel','fvnd-email','fvnd-comissao-extra','fvnd-meta','fvnd-obs'].forEach(function(fid){
+  ['fvnd-nome','fvnd-cpf','fvnd-tel','fvnd-email','fvnd-cvenda-override','fvnd-crec-override','fvnd-meta','fvnd-obs'].forEach(function(fid){
     var el=document.getElementById(fid); if(el) el.value='';
   });
   var fs=document.getElementById('fvnd-status'); if(fs) fs.selectedIndex=0;
@@ -8536,10 +8537,10 @@ function limparFormVendedor(){
 
 async function salvarVendedor(){
   var nome=document.getElementById('fvnd-nome').value.trim();
-  if(!nome){ showMsg('msg-vnd-vendedor','err','Informe o nome (*)'); return; }
-  if(!sheetsUrl){ showMsg('msg-vnd-vendedor','err','Configure o Google Sheets primeiro.'); return; }
+  if(!nome){ showToast('err','Informe o nome do vendedor (*)'); return; }
+  if(!sheetsUrl){ showToast('err','Configure o Google Sheets primeiro.'); return; }
   var btn=document.getElementById('btn-salvar-vnd-vendedor'); btn.disabled=true;
-  showMsg('msg-vnd-vendedor','loading','Salvando...');
+  showToast('loading','Salvando vendedor...');
   var id=editandoVendedorId||gerarId('VND',todosVendedores);
   var dc=editandoVendedorId?((todosVendedores.find(function(r){return String(r[0])===editandoVendedorId;})||[])[10]||''):dataAgora();
   var row=[id,nome,
@@ -8548,9 +8549,10 @@ async function salvarVendedor(){
     document.getElementById('fvnd-email').value.trim(),
     document.getElementById('fvnd-status').value,
     document.getElementById('fvnd-plano').value,
-    document.getElementById('fvnd-comissao-extra').value.trim(),
-    document.getElementById('fvnd-meta').value.trim(),
-    document.getElementById('fvnd-obs').value.trim(),
+    (document.getElementById('fvnd-cvenda-override')||{value:''}).value.trim(),
+    (document.getElementById('fvnd-crec-override')||{value:''}).value.trim(),
+    (document.getElementById('fvnd-meta')||{value:''}).value.trim(),
+    (document.getElementById('fvnd-obs')||{value:''}).value.trim(),
     dc,
   ];
   try{
@@ -8558,22 +8560,29 @@ async function salvarVendedor(){
       body:JSON.stringify({action:editandoVendedorId?'updateVendedor':'addVendedor',id:id,row:row})});
     const data=await res.json();
     if(data.ok){
-      showMsg('msg-vnd-vendedor','ok',editandoVendedorId?'Vendedor atualizado!':'Vendedor cadastrado!');
+      showToast('ok', editandoVendedorId?'Vendedor atualizado!':'Vendedor cadastrado!');
       carregarVendedores(function(list){ renderListaVendedores(list); popularSelectsVendedor(); selecionarVendedorForm(id); });
-    } else { showMsg('msg-vnd-vendedor','err','Erro: '+(data.error||'desconhecido')); }
-  } catch(e){ showMsg('msg-vnd-vendedor','err','Erro: '+e.message); }
+    } else { showToast('err','Erro: '+(data.error||'desconhecido')); }
+  } catch(e){ showToast('err','Erro: '+e.message); }
   btn.disabled=false;
 }
 
 async function excluirVendedor(id){
-  if(!sheetsUrl) return;
+  if(!sheetsUrl){ showToast('err','Configure o Google Sheets primeiro.'); return; }
+  showToast('loading','Excluindo vendedor...');
   try{
     const res=await fetch(sheetsUrl,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({action:'deleteVendedor',id:String(id)})});
     const data=await res.json();
-    if(data.ok){ editandoVendedorId=null; limparFormVendedor(); carregarVendedores(function(list){renderListaVendedores(list);popularSelectsVendedor();}); }
-    else { alert('Erro: '+(data.error||'')); }
-  } catch(e){ alert('Erro: '+e.message); }
+    if(data.ok){
+      showToast('ok','Vendedor excluído!');
+      editandoVendedorId=null;
+      limparFormVendedor();
+      carregarVendedores(function(list){ renderListaVendedores(list); popularSelectsVendedor(); });
+    } else {
+      showToast('err','Erro: '+(data.error||'desconhecido'));
+    }
+  } catch(e){ showToast('err','Erro: '+e.message); }
 }
 
 // ============================================================
@@ -8593,25 +8602,28 @@ function carregarPlanos(callback){
 }
 
 function popularSelectsPlano(){
-  var sel=document.getElementById('fvnd-plano'); if(!sel) return;
-  var val=sel.value;
-  sel.innerHTML='<option value="">Selecione um plano...</option>';
-  todosPlanos.filter(function(r){return String(r[5]||'Ativo')==='Ativo';}).forEach(function(r){
-    var opt=document.createElement('option'); opt.value=String(r[0]);
-    opt.textContent=String(r[1]||'');
-    sel.appendChild(opt);
-  });
-  if(val) sel.value=val;
-
-  var selV=document.getElementById('fvenda-plano'); if(!selV) return;
-  var valV=selV.value;
-  selV.innerHTML='<option value="">Selecione...</option>';
-  todosPlanos.filter(function(r){return String(r[5]||'Ativo')==='Ativo';}).forEach(function(r){
-    var opt=document.createElement('option'); opt.value=String(r[0]);
-    opt.textContent=String(r[1]||'');
-    selV.appendChild(opt);
-  });
-  if(valV) selV.value=valV;
+  // Popular fvnd-plano (vendedores)
+  var sel=document.getElementById('fvnd-plano');
+  if(sel){
+    var val=sel.value;
+    sel.innerHTML='<option value="">Selecione um plano...</option>';
+    todosPlanos.filter(function(r){return String(r[5]||'Ativo')==='Ativo';}).forEach(function(r){
+      var opt=document.createElement('option'); opt.value=String(r[0]);
+      opt.textContent=String(r[1]||''); sel.appendChild(opt);
+    });
+    if(val) sel.value=val;
+  }
+  // Popular fvenda-plano (vendas)
+  var selV=document.getElementById('fvenda-plano');
+  if(selV){
+    var valV=selV.value;
+    selV.innerHTML='<option value="">Selecione...</option>';
+    todosPlanos.filter(function(r){return String(r[5]||'Ativo')==='Ativo';}).forEach(function(r){
+      var opt=document.createElement('option'); opt.value=String(r[0]);
+      opt.textContent=String(r[1]||''); selV.appendChild(opt);
+    });
+    if(valV) selV.value=valV;
+  }
 }
 
 function renderListaPlanos(lista){
